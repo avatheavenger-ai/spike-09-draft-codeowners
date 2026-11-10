@@ -1,0 +1,35 @@
+# Opens a PR (draft or not) or marks one ready, as github-actions[bot],
+# so the PR's author and the code owner are different accounts.
+name: pr-actions
+on:
+  workflow_dispatch:
+    inputs:
+      action: { description: "open-draft, open-ready or mark-ready", required: true }
+      branch: { description: "branch name", required: true }
+      pr: { description: "PR number for mark-ready", required: false }
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  act:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Open a PR
+        if: inputs.action != 'mark-ready'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${{ inputs.branch }}"
+          echo "${{ inputs.branch }}" > "change-$(date +%s).txt"
+          git add -A && git commit -m "Change on ${{ inputs.branch }}"
+          git push origin "HEAD:refs/heads/${{ inputs.branch }}"
+          draft=""; [ "${{ inputs.action }}" = open-draft ] && draft="--draft"
+          gh pr create $draft --base main --head "${{ inputs.branch }}" --title "Spike 9: ${{ inputs.action }}" --body "Foundry spike 9"
+      - name: Mark a PR ready
+        if: inputs.action == 'mark-ready'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr ready "${{ inputs.pr }}" --repo "${{ github.repository }}"
